@@ -21,3 +21,12 @@ This template repository is a starting point for creating custom desktop images 
 - A Flatpak backend for your application manager
 - A VSO Plugin for your application manager used to visually perform system update
 - Input methods (Optional)
+
+### Workflows
+
+We've prepared two workflows.
+
+- `vib-build-autocheck.yml`: Automatically checks updates of base image. Only recommended if there are no big changes.
+- `vib-build.yml`: Need to be triggered manually or via a push. Suitable for those who prioritize stability.
+
+Before putting neither of them into use, please modify `IMAGE_NAME` in the workflow file.

@@ -97,10 +97,11 @@ jobs:
     steps:
     - name: Verify Base Image Integrity
       if: ${{ github.ref_type == 'tag' }}
-      run:
-        gh attestation verify oci://${{ needs.check_update.outputs.base_image }} --owner Vanilla-KDE
+      run: |
+        gh attestation verify "oci://$BASE_IMAGE" --owner "$(cut -d/ -f2 <<< "$BASE_IMAGE")"
       env:
         GH_TOKEN: ${{ github.token }}
+        BASE_IMAGE: ${{ needs.check_update.outputs.base_image }}
     
   build:
     strategy:

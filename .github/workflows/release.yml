@@ -15,9 +15,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - uses: actions/checkout@v7
+
+    - name: Install dependencies
+      run: sudo apt-get install -y libfyaml-utils
+
+    - name: Read base image name from recipe
+      run: |
+        BASE_IMAGE="$(fy-filter -f recipe.yml /stages/-1/base)"
+        echo The base image is $BASE_IMAGE
+        if [ -z "$BASE_IMAGE" ]; then exit 1; fi
+        echo "BASE_IMAGE=$BASE_IMAGE" >> "$GITHUB_ENV"
+
     - name: Verify Base Image Integrity
-      run:
-        gh attestation verify oci://ghcr.io/vanilla-kde/base:latest --owner Vanilla-KDE
+      run: |
+        gh attestation verify "oci://$BASE_IMAGE" --owner "$(cut -d/ -f2 <<< "$BASE_IMAGE")"
       env:
         GH_TOKEN: ${{ github.token }}
 

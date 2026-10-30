@@ -2,42 +2,26 @@ name: Vib Build
 
 on:
   push:
-    branches: [ 'main' ]
+    branches:
+      - 'dev'
+      - 'vision'
     tags:
       - '*'
   workflow_dispatch:
   pull_request:
 
 env:
-  IMAGE_NAME: custom
   BUILDX_NO_DEFAULT_ATTESTATIONS: 1
 
 jobs:
   verify-image:
     runs-on: ubuntu-latest
 
-    outputs:
-      base_image: ${{ steps.read_base_recipe.outputs.base_image }}
-
     steps:
-    - uses: actions/checkout@v7
-
-    - name: Install dependencies
-      run: sudo apt-get install -y libfyaml-utils
-
-    - name: Read base image name from recipe
-      id: read_base_recipe
-      run: |
-        BASE_IMAGE="$(fy-filter -f recipe.yml /stages/-1/base)"
-        echo The base image is $BASE_IMAGE
-        if [ -z "$BASE_IMAGE" ]; then exit 1; fi
-        echo "base_image=$BASE_IMAGE" >> "$GITHUB_OUTPUT"
-        echo "BASE_IMAGE=$BASE_IMAGE" >> "$GITHUB_ENV"
-
     - name: Verify Base Image Integrity
       if: ${{ github.ref_type == 'tag' }}
-      run: |
-        gh attestation verify "oci://$BASE_IMAGE" --owner "$(cut -d/ -f2 <<< "$BASE_IMAGE")"
+      run:
+        gh attestation verify oci://ghcr.io/vanilla-kde/base:dev --owner Vanilla-KDE
       env:
         GH_TOKEN: ${{ github.token }}
 
@@ -58,16 +42,16 @@ jobs:
     steps:
     - uses: actions/checkout@v7
 
-    - name: Generate image name
+    - name: Change tag in recipe
+      if: ${{ github.ref_type != 'tag' }}
       run: |
-        REPO_OWNER_LOWERCASE="$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')"
-        echo "REPO_OWNER_LOWERCASE=$REPO_OWNER_LOWERCASE" >> "$GITHUB_ENV"
-        echo "IMAGE_URL=ghcr.io/$REPO_OWNER_LOWERCASE/${{ env.IMAGE_NAME }}" >> "$GITHUB_ENV"
+        if [ -n "${{ github.base_ref }}" ]; then
+          TAG="${{ github.base_ref }}"
+        else
+          TAG="${{ github.ref_name }}"
+        fi
+        sed "s/ghcr.io\/vanilla-kde\/base:latest/ghcr.io\/vanilla-kde\/base:$TAG/" -i recipe.yml
 
-    - name: Set image info
-      run: |
-        echo -n "${{ needs.verify-image.outputs.base_image }}" > ./includes.container/image-info/base-image-name
-        echo -n "${{ env.REPO_OWNER_LOWERCASE }}/${{ env.IMAGE_NAME }}" > ./includes.container/image-info/image-name
 
     - uses: vanilla-os/vib-gh-action@v1.1.0
       with:
@@ -78,6 +62,12 @@ jobs:
         name: Containerfile
         path: Containerfile
         overwrite: true
+
+    - name: Generate image name
+      run: |
+        REPO_OWNER_LOWERCASE="$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')"
+        echo "REPO_OWNER_LOWERCASE=$REPO_OWNER_LOWERCASE" >> "$GITHUB_ENV"
+        echo "IMAGE_URL=ghcr.io/$REPO_OWNER_LOWERCASE/custom_name" >> "$GITHUB_ENV"
 
     - name: Docker meta
       id: meta
@@ -136,8 +126,6 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'pull_request' }}
     needs: build
-    outputs:
-      image: ${{ steps.image.outputs.image }}
     permissions:
       contents: write # Allow actions to create release
       packages: write # Allow pushing images to GHCR
@@ -146,12 +134,10 @@ jobs:
 
     steps:
     - name: Generate image name
-      id: image
       run: |
         REPO_OWNER_LOWERCASE="$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')"
         echo "REPO_OWNER_LOWERCASE=$REPO_OWNER_LOWERCASE" >> "$GITHUB_ENV"
-        echo "IMAGE_URL=ghcr.io/$REPO_OWNER_LOWERCASE/${{ env.IMAGE_NAME }}" >> "$GITHUB_ENV"
-        echo "image=ghcr.io/$REPO_OWNER_LOWERCASE/${{ env.IMAGE_NAME }}" >> "$GITHUB_OUTPUT"
+        echo "IMAGE_URL=ghcr.io/$REPO_OWNER_LOWERCASE/custom_name" >> "$GITHUB_ENV"
 
     - name: Download digests
       uses: actions/download-artifact@v8
@@ -169,7 +155,7 @@ jobs:
       if: ${{ github.ref_type == 'tag' }}
       run: |
         echo "EXTRA_TAG=raw,latest" >> "$GITHUB_ENV"
-        echo "IMAGE_TAG_LEGACY=${IMAGE_URL/${{ env.IMAGE_NAME }}/desktop}:main" >> "$GITHUB_ENV"
+        echo "IMAGE_TAG_LEGACY=${IMAGE_URL/custom_name/desktop}:main" >> "$GITHUB_ENV"
 
     - name: Docker meta
       id: meta
@@ -213,15 +199,16 @@ jobs:
 
   differ:
     runs-on: ubuntu-latest
-    if: github.ref_type == 'tag'
+    if: github.repository == 'vanilla-kde/desktop-image' && github.ref_type == 'tag'
     needs: merge
     container:
-      image: ${{ needs.merge.outputs.image }}:latest
+      image: ghcr.io/your_username/custom_name:latest
 
     steps:
       - uses: actions/checkout@v7
 
       - name: Generate package diff
+        # Change 'user' to 'orgs' if the repository is owned by an organization
         run: |
           lpkg --unlock
           PACKAGE_LIST=$(.github/gen_package_list.sh)
@@ -229,10 +216,10 @@ jobs:
           IMAGE_DIGEST=$(curl -s -L -H "Accept: application/vnd.github+json" \
           -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
-          https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/${{ env.IMAGE_NAME }}/versions | grep -m1 name | sed -E 's/^\s*"name": "(.+)".*$/\1/')
+          https://api.github.com/user/your_username/packages/container/custom_name/versions | grep -m1 name | sed -E 's/^\s*"name": "(.+)".*$/\1/') 
           curl -X POST \
           -H 'Accept:application/json' \
           -H "Authorization:Basic $(echo -n "${{ secrets.DIFFER_USER }}:${{ secrets.DIFFER_PSW }}" | base64)" \
           -d "{\"digest\":\"${IMAGE_DIGEST}\",${PACKAGE_LIST}}" \
-          ${{ vars.DIFFER_URL }}/images/${{ env.IMAGE_NAME }}/new
+          ${{ vars.DIFFER_URL }}/images/custom_name/new
           lpkg --lock

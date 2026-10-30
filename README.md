@@ -11,7 +11,7 @@ This template repository is a starting point for creating custom desktop images 
 
 - `includes.container/usr/bin/*`: Scripts for setting up terminal configuration for `apx-vso-native`. Varies depending on your terminal.
 - `modules/00-remove-unnecessities.yml`: Remove incompatible pre-installed components. Varies depending on your DE.
-- `modules/00-vanilla-backgrounds.yml`: Vanilla Backgrounds. The installation path of wallpapers may vary depending on your DE.
+- `modules/00-vanilla-backgrounds.yml`: Vanilla Backgrounds. The installation path of wallpapers may vary depending on your DE. Fork one if necessary.
 - `modules/99-cleanup.yml`: Be sure to check whether your desktop environment directly or indirectly depends on `sudo`.
 
 ### Packages
@@ -24,9 +24,7 @@ This template repository is a starting point for creating custom desktop images 
 
 ### Workflows
 
-We've prepared two workflows.
+Please modify the workflows as follows:
 
-- `vib-build-autocheck.yml`: Automatically checks updates of base image. Only recommended if there are no big changes.
-- `vib-build.yml`: Need to be triggered manually or via a push. Suitable for those who prioritize stability.
-
-Before putting neither of them into use, please modify `IMAGE_NAME` in the workflow file.
+- Replace `custom_name` with your desired image name
+- Replace `your_username` with the name of your user account/organization (Please pay attention to [steps using Github API](./.github/workflows/release.yml#L211)) 
